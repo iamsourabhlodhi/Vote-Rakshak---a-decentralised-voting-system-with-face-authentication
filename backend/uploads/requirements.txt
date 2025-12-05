@@ -1,0 +1,22 @@
+# --- Core Flask Backend ---
+Flask==2.3.2
+Flask-Cors==3.0.10
+
+# --- Web3 + Blockchain ---
+web3==6.15.1
+
+# --- Database ORM ---
+SQLAlchemy==2.0.25
+PyMySQL==1.1.1
+
+# --- Authentication ---
+PyJWT==2.8.0
+bcrypt==4.1.2
+
+# --- Image Processing (NO mediapipe) ---
+opencv-python==4.6.0.66
+opencv-contrib-python==4.6.0.66
+numpy==1.23.5
+
+# --- Utility ---
+requests==2.31.0

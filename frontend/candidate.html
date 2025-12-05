@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Candidates</title><link rel="stylesheet" href="style.css" /></head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h3>All Candidates</h3>
+      <div id="list"></div>
+    </div>
+  </div>
+<script>
+async function load(){ const res = await fetch('/candidates'); const data = await res.json(); const box=document.getElementById('list'); box.innerHTML=''; data.forEach(c=>{ const el=document.createElement('div'); el.className='candidate'; el.innerHTML=`<div class="meta"><strong>${c.id}. ${c.name}</strong></div><div class="badge">${c.votes}</div>`; box.appendChild(el); }); }
+load();
+</script>
+</body></html>

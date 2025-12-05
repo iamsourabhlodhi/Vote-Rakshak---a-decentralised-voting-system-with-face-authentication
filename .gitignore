@@ -1,0 +1,16 @@
+venv310/
+venv/
+.venv/
+ENV/
+
+backend/uploads/
+config/secret.py
+
+__pycache__/
+*.pyc
+*.pyo
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Register Voter</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand"><div class="logo">VR</div><div><div class="h-title">Register Voter</div><div class="sub">Admin camera capture</div></div></div>
+      <div><a href="/admin-dashboard" class="small">Admin Dashboard</a></div>
+    </div>
+
+    <div class="card fade-in">
+      <label class="label">Enrollment</label>
+      <input id="enrollment" class="input" placeholder="Enrollment number">
+
+      <label class="label mt8">Name</label>
+      <input id="name" class="input" placeholder="Full name">
+
+      <div class="mt8">
+        <label class="label">Camera</label>
+        <div class="video-wrap">
+          <video id="video" autoplay playsinline></video>
+          <div id="faceBox" class="face-box"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button id="capture" class="btn">Capture</button>
+          <button id="register" class="btn secondary">Register Voter</button>
+        </div>
+        <div id="msg" class="msg small mt8">Use camera to capture clear face. Admin token required.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const video = document.getElementById('video'), faceBox = document.getElementById('faceBox');
+let stream = null, captured = null;
+async function start(){ try{ stream = await navigator.mediaDevices.getUserMedia({video:{width:640}}); video.srcObject = stream; runFaceLoop(); }catch(e){ document.getElementById('msg').innerText='Camera not available'; } }
+start();
+
+let detector = (('FaceDetector' in window) ? new FaceDetector({fastMode:true,maxDetectedFaces:1}) : null);
+async function runFaceLoop(){
+  if(!video.videoWidth){ requestAnimationFrame(runFaceLoop); return; }
+  if(detector){
+    try{
+      const faces = await detector.detect(video);
+      if(faces && faces.length){
+        const f = faces[0].boundingBox;
+        faceBox.style.display='block';
+        faceBox.style.left = (f.x + f.width/2)+'px';
+        faceBox.style.top = (f.y + f.height/2)+'px';
+        faceBox.style.width = f.width+'px'; faceBox.style.height = f.height+'px';
+        faceBox.classList.add('ok'); faceBox.classList.remove('bad');
+      } else { faceBox.style.display='none'; }
+    }catch(e){ faceBox.style.display='none'; }
+  }
+  requestAnimationFrame(runFaceLoop);
+}
+
+document.getElementById('capture').onclick = ()=>{
+  const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height); captured = c.toDataURL('image/jpeg',0.9);
+  document.getElementById('msg').innerText = 'Captured ✔';
+};
+
+document.getElementById('register').onclick = async ()=>{
+  const enrollment = document.getElementById('enrollment').value.trim();
+  const name = document.getElementById('name').value.trim();
+  const token = localStorage.getItem('admin_token');
+  if(!token) return document.getElementById('msg').innerText='Admin token missing. Please login as admin.';
+  if(!enrollment || !name) return document.getElementById('msg').innerText='Enter enrollment and name';
+  if(!captured) return document.getElementById('msg').innerText='Capture face first';
+  const form = new FormData(); form.append('enrollment', enrollment); form.append('name', name); form.append('image', captured);
+  try{
+    const res = await fetch('/admin/register_voter_camera', {method:'POST', headers:{'Authorization':'Bearer '+token}, body:form});
+    const data = await res.json();
+    document.getElementById('msg').innerText = data.msg || data.error;
+  }catch(e){ document.getElementById('msg').innerText='Network error'; }
+}
+</script>
+</body>
+</html>

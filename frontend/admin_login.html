@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin Login</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="card" style="max-width:640px;margin:0 auto">
+      <div class="topbar">
+        <div class="brand"><div class="logo">AD</div><div><div class="h-title">Admin Login</div><div class="sub">Username + Password + Live face</div></div></div>
+      </div>
+
+      <div style="display:grid;gap:12px">
+        <label class="label">Username</label>
+        <input id="username" class="input" placeholder="Admin username">
+
+        <label class="label">Password</label>
+        <input id="password" type="password" class="input" placeholder="Password">
+
+        <label class="label">Camera (for face verify)</label>
+        <div class="video-wrap">
+          <video id="video" autoplay playsinline></video>
+          <div id="faceBox" class="face-box"></div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button id="check" class="btn">Check & Start Face</button>
+          <button id="verify" class="btn secondary">Verify Face & Login</button>
+        </div>
+
+        <div id="msg" class="msg small">Enter username+password then check. Face verification is required.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const video = document.getElementById('video'), faceBox = document.getElementById('faceBox');
+let stream=null, detector=null, lastCaptured=null;
+async function startCam(){
+  try{ stream = await navigator.mediaDevices.getUserMedia({video:{width:640}}); video.srcObject = stream; detector = ('FaceDetector' in window) ? new FaceDetector({fastMode:true,maxDetectedFaces:1}) : null; runLoop(); }catch(e){ document.getElementById('msg').innerText='Camera not available'; }
+}
+function runLoop(){
+  requestAnimationFrame(async ()=>{
+    if(detector){
+      try{
+        const faces = await detector.detect(video);
+        if(faces && faces.length){
+          const f = faces[0].boundingBox;
+          faceBox.style.display='block';
+          faceBox.style.left=(f.x+f.width/2)+'px'; faceBox.style.top=(f.y+f.height/2)+'px';
+          faceBox.style.width=f.width+'px'; faceBox.style.height=f.height+'px';
+          faceBox.classList.add('ok'); faceBox.classList.remove('bad');
+        } else { faceBox.style.display='none'; }
+      }catch(e){ faceBox.style.display='none'; }
+    }
+    runLoop();
+  });
+}
+
+document.getElementById('check').onclick = async ()=>{
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+  document.getElementById('msg').innerText='Checking credentials...';
+  try{
+    const res = await fetch('/admin/login_step1', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password})});
+    const d = await res.json();
+    if(!res.ok){ document.getElementById('msg').innerText=d.error; return; }
+    document.getElementById('msg').innerText='Password OK — starting camera for face verification';
+    startCam();
+  }catch(e){ document.getElementById('msg').innerText='Network error'; }
+};
+
+document.getElementById('verify').onclick = async ()=>{
+  // capture current frame
+  const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+  const data = c.toDataURL('image/jpeg',0.9);
+  const form = new FormData(); form.append('username', document.getElementById('username').value.trim()); form.append('image', data);
+  document.getElementById('msg').innerText='Verifying face...';
+  try{
+    const res = await fetch('/admin/login_face', {method:'POST', body:form});
+    const d = await res.json();
+    if(!res.ok){ document.getElementById('msg').innerText=d.error; return; }
+    localStorage.setItem('admin_token', d.token);
+    document.getElementById('msg').innerText='Login success — redirecting...';
+    setTimeout(()=>window.location.href='/admin-dashboard',800);
+  }catch(e){ document.getElementById('msg').innerText='Network error'; }
+};
+</script>
+</body>
+</html>

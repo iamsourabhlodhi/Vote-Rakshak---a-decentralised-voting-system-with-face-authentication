@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cast Vote — Decentralised Voting</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">VR</div>
+        <div>
+          <div class="h-title">Vote Rakshak</div>
+          <div class="sub">Authenticate with enrollment + live photo</div>
+        </div>
+      </div>
+      <div class="row">
+        <a href="/results" class="small" style="color:var(--muted);margin-right:12px">Results</a>
+        <a href="/admin" class="small" style="color:var(--muted)">Admin</a>
+      </div>
+    </div>
+
+    <div class="card grid fade-in">
+      <div>
+        <label class="label">Enrollment</label>
+        <input id="enroll" class="input" placeholder="Enter enrollment number">
+
+        <div class="mt8">
+          <label class="label">Camera</label>
+          <div class="video-wrap">
+            <video id="v" playsinline autoplay></video>
+            <div id="faceBox" class="face-box"></div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button id="cap" class="btn">Capture</button>
+            <button id="cast" class="btn secondary">Authenticate & Vote</button>
+          </div>
+
+          <div id="msg" class="msg small mt8">Capture a clear live photo of the voter.</div>
+        </div>
+      </div>
+
+      <div>
+        <h4>Choose Candidate</h4>
+        <div id="listCandidates" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="footer">Backend signs transaction. One vote per enrollment on-chain.</div>
+  </div>
+
+<script>
+/* Camera + face detection + capture + vote */
+const video = document.getElementById('v');
+const faceBox = document.getElementById('faceBox');
+let stream = null;
+let readyCapture = false;
+let capturedData = null;
+const msg = document.getElementById('msg');
+
+async function startCam(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{width:640}});
+    video.srcObject = stream;
+    runFaceLoop();
+  }catch(e){
+    msg.innerText = "Camera access denied or not available";
+  }
+}
+startCam();
+
+/* simple face detection using built-in FaceDetector if available, else fallback to bounding by getSettings (minimal) */
+const supportsFD = ('FaceDetector' in window);
+let detector = null;
+if(supportsFD){
+  try{ detector = new FaceDetector({fastMode:true, maxDetectedFaces:1}); }catch(e){ detector = null; }
+}
+
+async function runFaceLoop(){
+  const w = video.videoWidth, h = video.videoHeight;
+  if(!w || !h){ requestAnimationFrame(runFaceLoop); return; }
+
+  if(detector){
+    try{
+      const faces = await detector.detect(video);
+      if(faces && faces.length){
+        const f = faces[0].boundingBox;
+        // position faceBox at center of bounding box
+        faceBox.style.display = 'block';
+        faceBox.style.left = (f.x + f.width/2)+'px';
+        faceBox.style.top = (f.y + f.height/2)+'px';
+        faceBox.style.width = (f.width)+'px';
+        faceBox.style.height = (f.height)+'px';
+        faceBox.classList.add('ok'); faceBox.classList.remove('bad');
+        readyCapture = true;
+        msg.innerText = "Face detected — ready to capture.";
+      } else {
+        faceBox.style.display = 'none';
+        readyCapture = false;
+        msg.innerText = "No face detected — align face in frame.";
+      }
+    }catch(e){
+      // detector failed, hide box
+      faceBox.style.display = 'none';
+    }
+  } else {
+    // fallback - show small green dot to indicate camera is live
+    faceBox.style.display = 'none';
+  }
+
+  requestAnimationFrame(runFaceLoop);
+}
+
+/* candidate list load */
+async function loadCandidates(){
+  const res = await fetch('/candidates');
+  const data = await res.json();
+  const box = document.getElementById('listCandidates'); box.innerHTML = '';
+  if(!Array.isArray(data) || data.length===0){ box.innerHTML = '<div class="small">No candidates</div>'; return; }
+  data.forEach(c=>{
+    const node = document.createElement('div');
+    node.className = 'candidate';
+    node.innerHTML = `<div class="meta"><strong>${c.id}. ${c.name}</strong></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="badge">${c.votes}</div>
+        <input type="radio" name="candidate" value="${c.id}" />
+      </div>`;
+    box.appendChild(node);
+  });
+}
+loadCandidates();
+
+/* capture and cast */
+const capBtn = document.getElementById('cap');
+capBtn.onclick = ()=>{
+  if(!stream){ msg.innerText='Camera not ready'; return; }
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth; c.height = video.videoHeight;
+  const ctx = c.getContext('2d'); ctx.drawImage(video,0,0,c.width,c.height);
+  capturedData = c.toDataURL('image/jpeg', 0.9);
+  msg.innerText = 'Photo captured. Now choose candidate and click Authenticate & Vote.';
+};
+document.getElementById('cast').onclick = async ()=>{
+  const enroll = document.getElementById('enroll').value.trim();
+  if(!enroll) return msg.innerText='Please enter enrollment number';
+  if(!capturedData) return msg.innerText='Please capture photo first';
+  const sel = document.querySelector('input[name="candidate"]:checked');
+  if(!sel) return msg.innerText='Choose a candidate';
+  msg.innerText = 'Authenticating and submitting vote...';
+  const form = new FormData();
+  form.append('enrollment', enroll);
+  form.append('candidate_id', sel.value);
+  form.append('image', capturedData);
+  try{
+    const res = await fetch('/vote', {method:'POST', body:form});
+    const data = await res.json();
+    if(res.ok){ msg.innerText = data.msg || 'Vote cast'; loadCandidates(); }
+    else { msg.innerText = data.error || 'Failed to vote'; }
+  }catch(e){ msg.innerText = 'Network error'; }
+};
+</script>
+</body>
+</html>

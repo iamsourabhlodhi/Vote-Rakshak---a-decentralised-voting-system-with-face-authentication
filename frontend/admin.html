@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand"><div class="logo">AD</div><div><div class="h-title">Admin Dashboard</div><div class="sub">Manage candidates & voters</div></div></div>
+      <div class="row"><button id="logout" class="btn secondary">Logout</button></div>
+    </div>
+
+    <div class="admin-grid">
+      <div class="card">
+        <h3>Add Candidate</h3>
+        <label class="label">Name</label>
+        <input id="candName" class="input" placeholder="Candidate name">
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button id="addCand" class="btn">Add</button>
+        </div>
+        <div id="candMsg" class="msg small mt8">Add candidates to blockchain.</div>
+
+        <hr style="margin:16px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <h3>Voters</h3>
+        <div id="voterArea" style="max-height:300px;overflow:auto;margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <h3>Quick Actions</h3>
+        <div class="mt8">
+          <a href="/voter" class="btn">Register Voter (camera)</a>
+        </div>
+        <div class="mt16">
+          <h4>Candidates</h4>
+          <div id="candidateList" class="mt8"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const token = localStorage.getItem('admin_token');
+if(!token) location.href = '/admin';
+
+document.getElementById('logout').onclick = ()=>{ localStorage.removeItem('admin_token'); location.href='/admin'; };
+
+async function addCandidate(){
+  const name = document.getElementById('candName').value.trim();
+  if(!name) return document.getElementById('candMsg').innerText='Enter name';
+  try{
+    const res = await fetch('/admin/add_candidate', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify({name})});
+    const d = await res.json();
+    if(!res.ok) document.getElementById('candMsg').innerText = d.error || 'Add failed';
+    else{ document.getElementById('candMsg').innerText = 'Candidate added'; loadCandidates(); }
+  }catch(e){ document.getElementById('candMsg').innerText='Network error'; }
+}
+document.getElementById('addCand').onclick = addCandidate;
+
+async function loadVoters(){
+  try{
+    const res = await fetch('/admin/voters', {headers:{'Authorization':'Bearer '+token}});
+    if(!res.ok){ document.getElementById('voterArea').innerText='Unable to load voters'; return; }
+    const data = await res.json(); const area = document.getElementById('voterArea'); area.innerHTML='';
+    if(!data.length) { area.innerHTML='<div class="small">No voters</div>'; return; }
+    const table = document.createElement('table'); table.className='table';
+    table.innerHTML = '<thead><tr><th>Enrollment</th><th>Name</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    data.forEach(v=>{ const r = document.createElement('tr'); r.innerHTML = `<td>${v.enrollment}</td><td>${v.name}</td>`; tbody.appendChild(r); });
+    table.appendChild(tbody); area.appendChild(table);
+  }catch(e){ document.getElementById('voterArea').innerText='Network error'; }
+}
+
+async function loadCandidates(){
+  try{
+    const res = await fetch('/candidates');
+    const data = await res.json(); const box = document.getElementById('candidateList'); box.innerHTML='';
+    data.forEach(c=>{ const el = document.createElement('div'); el.className='candidate'; el.innerHTML = `<div class="meta"><strong>${c.id}. ${c.name}</strong></div><div class="badge">${c.votes}</div>`; box.appendChild(el); });
+  }catch(e){ document.getElementById('candidateList').innerText='Error'; }
+}
+
+loadVoters(); loadCandidates();
+</script>
+</body>
+</html>
