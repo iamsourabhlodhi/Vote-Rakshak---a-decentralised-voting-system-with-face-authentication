@@ -1,21 +1,138 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Results</title><link rel="stylesheet" href="style.css" /></head>
-<body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand"><div class="logo">RS</div><div><div class="h-title">Election Results</div><div class="sub">Live tallies from blockchain</div></div></div>
-      <div><a href="/" class="small">Home</a></div>
-    </div>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live Results - Election Commission</title>
 
-    <div class="card">
-      <h3>Candidates</h3>
-      <div id="list" style="margin-top:12px"></div>
-      <div class="footer">Refresh to get latest. Backend reads blockchain.</div>
-    </div>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* Charts side by side */
+.chart-flex{
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  gap:22px;
+  flex-wrap:wrap;
+  margin-top:15px;
+}
+
+/* === Adjust chart sizes here === */
+#pieChart{
+  width:200px !important;
+  height:200px !important;
+  max-width:230px;
+}
+
+#barChart{
+  width:330px !important;
+  height:230px !important;
+  max-width:360px;
+}
+
+/* Candidate vote list*/
+.vote-box{
+  background:#fff;
+  border:1px solid #ddd;
+  padding:10px 12px;
+  margin-bottom:7px;
+  border-radius:8px;
+  display:flex;
+  justify-content:space-between;
+  font-size:15px;
+}
+.vote-box b{color:#0a2a63;}
+.vote-box span{font-weight:600;color:#0a2a63;}
+</style>
+</head>
+
+<body>
+
+<div class="strip"></div>
+
+<header class="gov-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+      <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
+
+      <div>
+        <b>Vote Rakshak</b><br>
+        <small>Live Result Dashboard</small>
+      </div>
   </div>
+</header>
+
+<div class="container">
+<div class="card">
+
+<h2 style="color:#0a2a63;text-align:center;margin-bottom:10px;">Live Voting Results</h2>
+
+<!-- Smaller size charts placed side-by-side -->
+<div class="chart-flex">
+   <canvas id="pieChart"></canvas>
+   <canvas id="barChart"></canvas>
+</div>
+
+<h3 style="margin-top:22px;color:#0a2a63;text-align:center;">Candidate Vote Details</h3>
+<div id="voteList" style="margin-top:10px;"></div>
+
+<p id="update" class="small" style="margin-top:10px;color:gray;text-align:center;">Updating...</p>
+
+</div>
+</div>
 
 <script>
-async function load(){ const res = await fetch('/candidates'); const data = await res.json(); const box = document.getElementById('list'); box.innerHTML=''; if(!Array.isArray(data)||data.length===0){box.innerHTML='<div class="small">No candidates</div>';return;} data.forEach(c=>{ const el = document.createElement('div'); el.className='candidate'; el.innerHTML=`<div class="meta"><strong>${c.id}. ${c.name}</strong></div><div class="badge">${c.votes}</div>`; box.appendChild(el); }); }
-load();
+let pieChart,barChart;
+
+async function fetchVotes(){
+  const res=await fetch("/candidates");
+  const data=await res.json();
+
+  const names=data.map(c=>c.name);
+  const votes=data.map(c=>c.votes);
+
+  updateCharts(names,votes);
+  updateList(data);
+
+  document.getElementById("update").innerText=
+    "Last updated: "+new Date().toLocaleTimeString();
+}
+
+function updateCharts(names,votes){
+
+  if(pieChart) pieChart.destroy();
+  pieChart=new Chart(document.getElementById("pieChart"),{
+    type:"pie",
+    data:{labels:names,datasets:[{data:votes,borderWidth:1}]}
+  });
+
+  if(barChart) barChart.destroy();
+  barChart=new Chart(document.getElementById("barChart"),{
+    type:"bar",
+    data:{labels:names,datasets:[{label:"Votes",data:votes,borderWidth:1}]},
+    options:{
+      scales:{y:{beginAtZero:true}},
+      plugins:{legend:{display:false}}
+    }
+  });
+}
+
+function updateList(data){
+  const box=document.getElementById("voteList");
+  box.innerHTML="";
+  data.forEach(c=>{
+    box.innerHTML+=`
+      <div class="vote-box">
+         <b>${c.name}</b>
+         <span>${c.votes} votes</span>
+      </div>`;
+  });
+}
+
+fetchVotes();
+setInterval(fetchVotes,3000);
 </script>
-</body></html>
+
+</body>
+</html>

@@ -16,9 +16,8 @@
 <div class="strip"></div>
 <header class="gov-header">
   <div style="display:flex;align-items:center;gap:10px">
-   <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
-
-    <div><b>Vote Rakshak</b><br><small>Decentralised Voting System</small></div>
+    <img src="https://i.ibb.co/gZ4NyZQ/emblem-black.png" width="42">
+    <div><b>Election Commission of India</b><br><small>Digital Voting System</small></div>
   </div>
   <nav class="top-links">
     <a href="/">Home</a><a href="/results">Results</a><a href="/admin">Admin</a>
@@ -166,22 +165,14 @@ async function loadCandidates(){
   const d=await r.json();
   const box=document.getElementById("listCandidates");
   box.innerHTML="";
-
   d.forEach(c=>{
     let el=document.createElement("div");
     el.className="candidate";
-    el.innerHTML=`
-      <strong>${c.id}. ${c.name}</strong>
-      <span class="badge">${c.votes ?? 0} Votes</span>
-      <input type="radio" name="candidate" value="${c.id}">
-    `;
+    el.innerHTML=`<strong>${c.id}. ${c.name}</strong><input type="radio" name="candidate" value="${c.id}">`;
     box.appendChild(el);
   });
 }
 loadCandidates();
-// Auto Refresh Every 3 Seconds
-setInterval(loadCandidates, 3000);
-
 
 /* Submit vote */
 document.getElementById("cast").onclick=async()=>{

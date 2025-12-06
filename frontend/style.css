@@ -1,89 +1,265 @@
-/* style.css - Modern glassmorphism responsive theme */
+/* ===============================================================
+   GOVERNMENT ELECTION PORTAL UI + ADVANCED CAMERA FEATURES
+   (Oval Removed Globally - Auto Capture Still Works)
+================================================================ */
+
+/* THEME COLORS */
 :root{
-  --bg-1: linear-gradient(135deg,#0f1724 0%, #0b1b2b 100%);
-  --card: rgba(255,255,255,0.06);
-  --glass-border: rgba(255,255,255,0.08);
-  --accent: #6ee7b7;
-  --accent-2: #60a5fa;
-  --danger: #ff6b6b;
-  --muted: #cbd5e1;
-  --glass-blur: 10px;
-  --maxw: 1100px;
-  --radius: 14px;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --primary:#0a2a63;
+  --accent1:#FF9933;
+  --accent2:#138808;
+  --bg:#eef3f8;
+  --card-bg:#ffffff;
+  --text:#111;
+  --muted:#5c5c5c;
+  --border:#d6d6d6;
+  --radius:12px;
+  --maxw:1100px;
+  font-family:"Segoe UI",Roboto,Arial,sans-serif;
 }
 
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;background:var(--bg-1);color:#e6eef8;-webkit-font-smoothing:antialiased}
-.container{max-width:var(--maxw);margin:32px auto;padding:24px}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
-.brand{display:flex;align-items:center;gap:12px}
-.logo{
-  width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  display:flex;align-items:center;justify-content:center;font-weight:700;color:#032;box-shadow:0 6px 18px rgba(6,12,34,0.6);
-}
-.h-title{font-size:20px;margin:0}
-.sub{color:var(--muted);font-size:13px}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  color:var(--text);
 
-/* CARD */
+  /* Background tricolor fade */
+  background: linear-gradient(
+      180deg,
+      rgba(255,153,51,0.18) 0%,
+      rgba(255,255,255,0.45) 50%,
+      rgba(19,136,8,0.20) 100%
+  ),
+  var(--bg);
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+/* Tricolor strip */
+.strip{
+  height:6px;
+  background:linear-gradient(90deg,var(--accent1),#fff,var(--accent2));
+}
+
+/* Government Header */
+.gov-header{
+  background:var(--primary);
+  color:white;
+  padding:12px 22px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:5px solid var(--accent2);
+}
+
+.top-links a{
+  color:white;
+  font-weight:600;
+  margin-left:15px;
+  text-decoration:none;
+  padding:4px 8px;
+  border-radius:4px;
+}
+.top-links a:hover{background:#ffffff25;}
+
+/* Layout Main */
+.container{
+  max-width:var(--maxw);
+  margin:30px auto;
+  padding:16px;
+}
+
+/* Card */
 .card{
-  background:var(--card);
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  padding:22px;
   border-radius:var(--radius);
-  padding:18px;
-  border:1px solid var(--glass-border);
-  backdrop-filter: blur(var(--glass-blur));
-  box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+  margin-top:22px;
+  border-left:6px solid var(--primary);
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  transition:.2s;
+}
+.card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 5px 18px rgba(0,0,0,.18);
 }
 
-/* grid */
-.grid{display:grid;grid-template-columns:1fr 380px;gap:18px}
-@media(max-width:900px){.grid{grid-template-columns:1fr}}
-
-/* inputs / buttons */
-.input, input[type="text"], input[type="password"], textarea, select{
-  width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);
-  background:rgba(255,255,255,0.02);color:#e6eef8;outline:none;font-size:14px;
+/* Grid */
+.grid{
+  display:grid;
+  grid-template-columns:1fr 380px;
+  gap:18px;
 }
-.label{font-size:13px;color:var(--muted);margin-bottom:6px;display:block}
-.row{display:flex;gap:10px;align-items:center}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr;}
+}
+
+/* Inputs & Buttons */
+.input{
+  width:100%;
+  padding:10px;
+  margin-bottom:8px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  font-size:14px;
+  background:white;
+}
 .btn{
-  background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;padding:10px 14px;border-radius:10px;color:#032;font-weight:600;cursor:pointer;
-  box-shadow:0 6px 20px rgba(32,170,145,0.12);
+  background:var(--accent1);
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  font-weight:600;
+  cursor:pointer;
+  color:#000;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
 }
-.btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);font-weight:600}
-.small{font-size:13px;color:var(--muted)}
-
-/* camera */
-.video-wrap{position:relative;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)}
-video{display:block;width:100%;height:auto;background:#000}
-.face-box{
-  position:absolute;left:0;top:0;border:3px solid var(--danger);pointer-events:none;transform:translate(-50%,-50%);display:none;
-  width:120px;height:120px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.6);
+.btn:hover{opacity:.88;}
+.btn.secondary{
+  background:var(--primary);
+  color:white;
 }
-.face-box.ok{border-color:rgba(110,231,183,0.95);box-shadow:0 8px 30px rgba(96,165,250,0.06)}
-.face-box.bad{border-color:rgba(255,107,107,0.95)}
-.msg{margin-top:10px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);color:var(--muted)}
+.btn.secondary:hover{opacity:.9;}
 
-/* candidate list */
-.candidate{display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);margin-bottom:8px;background:linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.006))}
-.candidate .meta{display:flex;gap:10px;align-items:center}
-.badge{background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:999px;font-weight:700;color:var(--muted)}
-.footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+.label{
+  font-size:14px;
+  font-weight:600;
+  margin-bottom:4px;
+  color:var(--primary);
+}
+.small{font-size:13px;color:var(--muted);}
+.footer{text-align:center;margin-top:15px;font-size:13px;color:#444;}
 
-/* admin dashboard layout */
-.admin-grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
-@media(max-width:980px){.admin-grid{grid-template-columns:1fr}}
+/* Camera Wrapper */
+.video-wrap{
+  border:1px solid #bbb;
+  border-radius:10px;
+  overflow:hidden;
+  background:#000;
+  position:relative;
+}
+video{
+  width:100%;
+  display:block;
+  transform:scaleX(-1); /* preview mirror */
+}
 
-/* nice table */
-.table{width:100%;border-collapse:collapse}
-.table th{font-size:13px;text-align:left;padding:8px;color:var(--muted)}
-.table td{padding:10px;border-top:1px solid rgba(255,255,255,0.02)}
+/* (Removed completely - safe for auto capture detection) */
+.face-guide,
+.face-guide.good,
+.face-guide.ready,
+.face-guide.bad{
+  display:none!important; /* <- Oval Disabled Globally */
+  visibility:hidden!important;
+  opacity:0!important;
+  width:0!important;
+  height:0!important;
+  border:none!important;
+}
 
-/* responsive utilities */
-.center{text-align:center}
-.mt8{margin-top:8px}
-.mt16{margin-top:16px}
+/* Old face-box kept but hidden in case used later */
+.face-box{display:none!important;}
 
-/* subtle animation */
-.fade-in{animation:fadeIn .35s ease both}
-@keyframes fadeIn {from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* Quality dots */
+.quality-bar{
+  display:flex;
+  gap:6px;
+  margin-top:10px;
+  justify-content:center;
+}
+.q-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#bbb;
+}
+.q-bad{background:#d62828!important;}
+.q-mid{background:#f4a100!important;}
+.q-good{background:#138808!important;}
+
+/* Captured Image Preview */
+#previewBox{
+  margin-top:10px;
+  text-align:center;
+  display:none;
+}
+#previewImg{
+  width:160px;
+  border-radius:10px;
+  border:2px solid #138808;
+  box-shadow:0 0 10px rgba(0,0,0,.3);
+}
+
+/* Warnings */
+.light-warning,
+.blur-warning,
+.pose-warning{
+  margin-top:10px;
+  padding:8px;
+  font-size:14px;
+  font-weight:600;
+  border-radius:6px;
+  text-align:center;
+  display:none;
+}
+.light-warning{background:#ffeb3b;color:#333;}
+.blur-warning{background:#ff4d4d;color:white;}
+.pose-warning{background:#00aaff;color:white;}
+
+/* Auto Capture Countdown */
+.countdown{
+  width:70px;
+  height:70px;
+  background:#000;
+  color:#fff;
+  font-size:26px;
+  border-radius:50%;
+  margin:10px auto 0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+}
+
+/* Candidate List UI */
+.candidate{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  margin-bottom:8px;
+  background:white;
+  border:1px solid var(--border);
+  border-radius:10px;
+  border-left:5px solid var(--primary);
+}
+.candidate strong{color:var(--primary);}
+.badge{
+  background:var(--primary);
+  color:#fff;
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:bold;
+}
+
+/* Tables */
+.table{width:100%;border-collapse:collapse;}
+.table th{
+  text-align:left;
+  padding:8px;
+  font-size:13px;
+  color:var(--muted);
+}
+.table td{
+  padding:8px;
+  border-top:1px solid #eee;
+  font-size:14px;
+}
+
+.ashoka{
+  width:65px;
+  filter:drop-shadow(0 0 3px gold) brightness(1.1);
+}
+#listCandidates{
+  margin-top:12px;   
+}

@@ -1,13 +1,46 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Candidates</title><link rel="stylesheet" href="style.css" /></head>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Candidate List - Election Portal</title>
+<link rel="stylesheet" href="style.css">
+</head>
 <body>
-  <div class="container">
-    <div class="card">
-      <h3>All Candidates</h3>
-      <div id="list"></div>
-    </div>
+
+<div class="strip"></div>
+<header class="gov-header">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
+    <div><b>Vote Rakshak</b><br><span style="font-size:12px;">Candidate List</span></div>
   </div>
+  <nav class="top-links">
+      <a href="/">Home</a>
+      <a href="/results">Results</a>
+  </nav>
+</header>
+
+<div class="container">
+<div class="card">
+<h3 style="color:#0a2a63">Registered Candidates</h3>
+<div id="list"></div>
+</div>
+</div>
+
 <script>
-async function load(){ const res = await fetch('/candidates'); const data = await res.json(); const box=document.getElementById('list'); box.innerHTML=''; data.forEach(c=>{ const el=document.createElement('div'); el.className='candidate'; el.innerHTML=`<div class="meta"><strong>${c.id}. ${c.name}</strong></div><div class="badge">${c.votes}</div>`; box.appendChild(el); }); }
+async function load(){
+ let r=await fetch("/candidates");
+ let d=await r.json();
+
+ list.innerHTML="";
+ d.forEach(c=>{
+   let el=document.createElement("div");
+   el.className="candidate";
+   el.innerHTML=`<strong>${c.id}. ${c.name}</strong><div class='badge'>${c.votes}</div>`;
+   list.appendChild(el);
+ });
+}
 load();
 </script>
-</body></html>
+</body>
+</html>

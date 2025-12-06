@@ -1,82 +1,164 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Register Voter</title>
-<link rel="stylesheet" href="style.css" />
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Register Voter - Election Portal</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand"><div class="logo">VR</div><div><div class="h-title">Register Voter</div><div class="sub">Admin camera capture</div></div></div>
-      <div><a href="/admin-dashboard" class="small">Admin Dashboard</a></div>
-    </div>
 
-    <div class="card fade-in">
-      <label class="label">Enrollment</label>
-      <input id="enrollment" class="input" placeholder="Enrollment number">
-
-      <label class="label mt8">Name</label>
-      <input id="name" class="input" placeholder="Full name">
-
-      <div class="mt8">
-        <label class="label">Camera</label>
-        <div class="video-wrap">
-          <video id="video" autoplay playsinline></video>
-          <div id="faceBox" class="face-box"></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button id="capture" class="btn">Capture</button>
-          <button id="register" class="btn secondary">Register Voter</button>
-        </div>
-        <div id="msg" class="msg small mt8">Use camera to capture clear face. Admin token required.</div>
-      </div>
+<div class="strip"></div>
+<header class="gov-header">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
+    <div>
+      <b>Vote Rakshak</b><br>
+      <span style="font-size:12px;">Voter Enrollment</span>
     </div>
   </div>
+  <nav class="top-links"><a href="/admin-dashboard">Back to Admin</a></nav>
+</header>
+
+<div class="container">
+<div class="card" style="max-width:600px;margin:auto">
+
+<h3 style="color:#0a2a63">Register New Voter</h3>
+
+<label class="label">Enrollment Number</label>
+<input id="enroll" class="input" placeholder="Enter enrollment">
+
+<label class="label">Full Name</label>
+<input id="name" class="input" placeholder="Enter voter full name">
+
+<label class="label">Capture Face</label>
+<div class="video-wrap">
+    <video id="vid" autoplay playsinline></video>
+
+    <div id="faceBox" class="face-box"></div>
+    <div class="face-guide"></div>
+    <div id="countdown" class="countdown"></div>
+</div>
+
+<div class="quality-bar"><div class="q-dot" id="q1"></div><div class="q-dot" id="q2"></div><div class="q-dot" id="q3"></div></div>
+
+<div id="lightCheck" class="light-warning">⚠ Low Light</div>
+<div id="blurCheck" class="blur-warning">❗ Image Blurry</div>
+<div id="poseCheck" class="pose-warning">🙂 Look Straight</div>
+
+<button id="cap" class="btn secondary" style="margin-top:10px;width:100%;">Capture Photo</button>
+<button id="reg" class="btn" style="margin-top:10px;width:100%;">Save Voter</button>
+
+<div id="previewBox">
+<p style="font-size:13px">Captured Image:</p>
+<img id="previewImg">
+</div>
+
+<p id="msg" class="small" style="margin-top:10px;"></p>
+
+</div>
+</div>
 
 <script>
-const video = document.getElementById('video'), faceBox = document.getElementById('faceBox');
-let stream = null, captured = null;
-async function start(){ try{ stream = await navigator.mediaDevices.getUserMedia({video:{width:640}}); video.srcObject = stream; runFaceLoop(); }catch(e){ document.getElementById('msg').innerText='Camera not available'; } }
-start();
+let stream=null,captured=null,stable=0,auto=false;
+const video=document.getElementById("vid");
 
-let detector = (('FaceDetector' in window) ? new FaceDetector({fastMode:true,maxDetectedFaces:1}) : null);
-async function runFaceLoop(){
-  if(!video.videoWidth){ requestAnimationFrame(runFaceLoop); return; }
-  if(detector){
-    try{
-      const faces = await detector.detect(video);
-      if(faces && faces.length){
-        const f = faces[0].boundingBox;
-        faceBox.style.display='block';
-        faceBox.style.left = (f.x + f.width/2)+'px';
-        faceBox.style.top = (f.y + f.height/2)+'px';
-        faceBox.style.width = f.width+'px'; faceBox.style.height = f.height+'px';
-        faceBox.classList.add('ok'); faceBox.classList.remove('bad');
-      } else { faceBox.style.display='none'; }
-    }catch(e){ faceBox.style.display='none'; }
-  }
-  requestAnimationFrame(runFaceLoop);
+/* Camera Start */
+navigator.mediaDevices.getUserMedia({video:{width:640}}).then(s=>{
+   stream=s; video.srcObject=s; detect();
+});
+
+/* Face Detector */
+const detector=('FaceDetector' in window)?new FaceDetector({fastMode:true,maxDetectedFaces:1}):null;
+
+async function detect(){
+ if(!video.videoWidth){requestAnimationFrame(detect);return;}
+
+ const f=await detector.detect(video).catch(()=>[]);
+ if(f.length){
+   faceBox.style.display="block";
+   let b=f[0].boundingBox;
+   faceBox.style.left=(b.x+b.width/2)+"px";
+   faceBox.style.top=(b.y+b.height/2)+"px";
+   faceBox.style.width=b.width+"px";
+   faceBox.style.height=b.height+"px";
+   stable++;
+
+   qualityCheck(b);
+   if(stable>30 && !auto){ auto=true; autoSnap(); }
+ }else{ faceBox.style.display="none"; stable=0; }
+
+ requestAnimationFrame(detect);
 }
 
-document.getElementById('capture').onclick = ()=>{
-  const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
-  c.getContext('2d').drawImage(video,0,0,c.width,c.height); captured = c.toDataURL('image/jpeg',0.9);
-  document.getElementById('msg').innerText = 'Captured ✔';
+/* BLUR / LIGHT / POSE checks (same as index.html logic) */
+function qualityCheck(b){
+   // Light
+   const c=document.createElement("canvas");
+   c.width=64;c.height=64;
+   c.getContext("2d").drawImage(video,0,0,64,64);
+   let d=c.getContext("2d").getImageData(0,0,64,64).data,sum=0;
+   for(let i=0;i<d.length;i+=4)sum+=(d[i]+d[i+1]+d[i+2])/3;
+   let bright=sum/(64*64);
+   lightCheck.style.display=bright<70?"block":"none";
+
+   // Blur
+   const t=document.createElement("canvas");
+   t.width=video.videoWidth;t.height=video.videoHeight;
+   let ctx=t.getContext("2d");
+   ctx.drawImage(video,0,0);
+   let img=ctx.getImageData(0,0,t.width,t.height).data,a=0;
+   for(let i=0;i<img.length;i+=4)a+=Math.abs(img[i]-(img[i+4]||img[i]));
+   blurCheck.style.display=a/(img.length/4)<9?"block":"none";
+
+   // Pose
+   let center=video.videoWidth/2;
+   let faceCenter=b.x+b.width/2;
+   poseCheck.style.display=Math.abs(faceCenter-center)>80?"block":"none";
+
+   [q1,q2,q3].forEach(e=>e.className="q-dot");
+   if(bright>120)q3.classList.add("q-good");
+   else if(bright>75)q2.classList.add("q-mid"),q1.classList.add("q-mid");
+   else q1.classList.add("q-bad");
+}
+
+/* Auto countdown */
+function autoSnap(){
+ countdown.style.display="flex";
+ let s=3; countdown.innerText=s;
+ let tm=setInterval(()=>{
+  s--; countdown.innerText=s;
+  if(s<=0){clearInterval(tm); countdown.style.display="none"; capture(); }
+ },700);
+}
+cap.onclick=()=>capture();
+
+/* Capture */
+function capture(){
+ const c=document.createElement("canvas");
+ c.width=video.videoWidth;c.height=video.videoHeight;
+ let ctx=c.getContext("2d");
+ ctx.translate(c.width,0); ctx.scale(-1,1);
+ ctx.drawImage(video,0,0);
+
+ captured=c.toDataURL("image/jpeg",0.9);
+ previewImg.src=captured; previewBox.style.display="block";
+ msg.innerText="Image captured ✔";
+}
+
+/* Save to DB */
+reg.onclick=async()=>{
+ const e=enroll.value.trim(),n=name.value.trim();
+ if(!e||!n) return msg.innerText="Fill details";
+ if(!captured) return msg.innerText="Capture photo first";
+
+ let fd=new FormData();
+ fd.append("enrollment",e); fd.append("name",n); fd.append("image",captured);
+
+ let r=await fetch("/admin/register_voter_camera",{method:"POST",headers:{'Authorization':'Bearer '+localStorage.getItem("admin_token")},body:fd});
+ let d=await r.json();
+ msg.innerText=r.ok?"Voter registered ✔":d.error;
 };
-
-document.getElementById('register').onclick = async ()=>{
-  const enrollment = document.getElementById('enrollment').value.trim();
-  const name = document.getElementById('name').value.trim();
-  const token = localStorage.getItem('admin_token');
-  if(!token) return document.getElementById('msg').innerText='Admin token missing. Please login as admin.';
-  if(!enrollment || !name) return document.getElementById('msg').innerText='Enter enrollment and name';
-  if(!captured) return document.getElementById('msg').innerText='Capture face first';
-  const form = new FormData(); form.append('enrollment', enrollment); form.append('name', name); form.append('image', captured);
-  try{
-    const res = await fetch('/admin/register_voter_camera', {method:'POST', headers:{'Authorization':'Bearer '+token}, body:form});
-    const data = await res.json();
-    document.getElementById('msg').innerText = data.msg || data.error;
-  }catch(e){ document.getElementById('msg').innerText='Network error'; }
-}
 </script>
 </body>
 </html>

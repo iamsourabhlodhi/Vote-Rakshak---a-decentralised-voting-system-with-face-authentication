@@ -1,91 +1,187 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin Login</title>
-<link rel="stylesheet" href="style.css" />
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin Login - Election Portal</title>
+<link rel="stylesheet" href="style.css"/>
+
+<!-- MediaPipe FaceMesh -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<style>
+/* Hide oval ONLY on admin page, keep it on index + voter */
+body.admin-page .face-guide,
+body.admin-page .face-guide.good,
+body.admin-page .face-guide.ready,
+body.admin-page .face-guide.bad {
+    display:none !important;
+    visibility:hidden !important;
+    opacity:0 !important;
+}
+</style>
 </head>
-<body>
-  <div class="container">
-    <div class="card" style="max-width:640px;margin:0 auto">
-      <div class="topbar">
-        <div class="brand"><div class="logo">AD</div><div><div class="h-title">Admin Login</div><div class="sub">Username + Password + Live face</div></div></div>
+
+<!-- IMPORTANT -->
+<body class="admin-page">
+
+<div class="strip"></div>
+<header class="gov-header">
+  <div style="display:flex;align-items:center;gap:10px;">
+      <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
+      <div>
+        <b>Vote Rakshak</b><br>
+        <span style="font-size:12px;">Admin Authentication</span>
       </div>
-
-      <div style="display:grid;gap:12px">
-        <label class="label">Username</label>
-        <input id="username" class="input" placeholder="Admin username">
-
-        <label class="label">Password</label>
-        <input id="password" type="password" class="input" placeholder="Password">
-
-        <label class="label">Camera (for face verify)</label>
-        <div class="video-wrap">
-          <video id="video" autoplay playsinline></video>
-          <div id="faceBox" class="face-box"></div>
-        </div>
-
-        <div style="display:flex;gap:8px">
-          <button id="check" class="btn">Check & Start Face</button>
-          <button id="verify" class="btn secondary">Verify Face & Login</button>
-        </div>
-
-        <div id="msg" class="msg small">Enter username+password then check. Face verification is required.</div>
-      </div>
-    </div>
   </div>
+</header>
+
+<div class="container">
+<div class="card" style="max-width:520px;margin:auto;">
+
+<h3 style="color:#0a2a63">Admin Login</h3>
+
+<label class="label">Username</label>
+<input id="username" class="input" placeholder="Admin Username">
+
+<label class="label">Password</label>
+<input id="password" type="password" class="input" placeholder="Password">
+
+<button id="step1" class="btn secondary" style="width:100%;margin-top:10px;">Verify Credentials</button>
+<p id="msg" class="small" style="margin-top:10px;">Step 1: Verify username & password</p>
+
+<!-- CAMERA SECTION -->
+<div id="camBox" style="display:none;margin-top:20px">
+<label class="label">Face Verification</label>
+
+<div class="video-wrap">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div id="countdown" class="countdown"></div> <!-- visible only during auto -->
+</div>
+
+<button id="capture" class="btn" style="margin-top:10px;width:100%;">Capture & Login (Manual)</button>
+
+<div id="previewBox" style="display:none;text-align:center;margin-top:10px;">
+    <p>Captured:</p>
+    <img id="previewImg" style="width:160px;border-radius:10px;border:2px solid #004aad;">
+</div>
+
+</div>
+</div>
+</div>
 
 <script>
-const video = document.getElementById('video'), faceBox = document.getElementById('faceBox');
-let stream=null, detector=null, lastCaptured=null;
-async function startCam(){
-  try{ stream = await navigator.mediaDevices.getUserMedia({video:{width:640}}); video.srcObject = stream; detector = ('FaceDetector' in window) ? new FaceDetector({fastMode:true,maxDetectedFaces:1}) : null; runLoop(); }catch(e){ document.getElementById('msg').innerText='Camera not available'; }
-}
-function runLoop(){
-  requestAnimationFrame(async ()=>{
-    if(detector){
-      try{
-        const faces = await detector.detect(video);
-        if(faces && faces.length){
-          const f = faces[0].boundingBox;
-          faceBox.style.display='block';
-          faceBox.style.left=(f.x+f.width/2)+'px'; faceBox.style.top=(f.y+f.height/2)+'px';
-          faceBox.style.width=f.width+'px'; faceBox.style.height=f.height+'px';
-          faceBox.classList.add('ok'); faceBox.classList.remove('bad');
-        } else { faceBox.style.display='none'; }
-      }catch(e){ faceBox.style.display='none'; }
-    }
-    runLoop();
+let captured=null,stable=0,autoReady=true;
+
+const msg=document.getElementById("msg");
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const preview=document.getElementById("previewImg");
+const countdown=document.getElementById("countdown");
+
+/* Step-1 authentication */
+document.getElementById("step1").onclick=async()=>{
+  let u=username.value.trim(), p=password.value.trim();
+  if(!u||!p) return msg.innerText="Enter credentials first";
+
+  const res=await fetch("/admin/login_step1",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:u,password:p})
   });
+  const d=await res.json();
+
+  if(!res.ok){ msg.innerText=d.error||"Invalid"; return; }
+
+  msg.innerText="Step 1 OK ✔ Face verification required";
+  camBox.style.display="block";
+  startCamera();
+};
+
+/* ------------ MediaPipe FaceMesh Setup ------------ */
+const faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+faceMesh.setOptions({maxNumFaces:1,minDetectionConfidence:0.6,minTrackingConfidence:0.6});
+faceMesh.onResults(onFaceDetect);
+
+async function startCamera(){
+  const stream=await navigator.mediaDevices.getUserMedia({video:true});
+  video.srcObject=stream;
+  const cam=new Camera(video,{onFrame:async()=>await faceMesh.send({image:video})});
+  cam.start();
 }
 
-document.getElementById('check').onclick = async ()=>{
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
-  document.getElementById('msg').innerText='Checking credentials...';
-  try{
-    const res = await fetch('/admin/login_step1', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password})});
-    const d = await res.json();
-    if(!res.ok){ document.getElementById('msg').innerText=d.error; return; }
-    document.getElementById('msg').innerText='Password OK — starting camera for face verification';
-    startCam();
-  }catch(e){ document.getElementById('msg').innerText='Network error'; }
-};
+/* Auto Detect Face - No Oval Showing Here */
+function onFaceDetect(r){
+  if(r.multiFaceLandmarks.length){
+      stable++;
+      if(stable>35 && autoReady){
+          autoReady=false;
+          runAutoCapture();
+      }
+  }else{
+      stable=0; autoReady=true;
+  }
+}
 
-document.getElementById('verify').onclick = async ()=>{
-  // capture current frame
-  const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
-  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
-  const data = c.toDataURL('image/jpeg',0.9);
-  const form = new FormData(); form.append('username', document.getElementById('username').value.trim()); form.append('image', data);
-  document.getElementById('msg').innerText='Verifying face...';
-  try{
-    const res = await fetch('/admin/login_face', {method:'POST', body:form});
-    const d = await res.json();
-    if(!res.ok){ document.getElementById('msg').innerText=d.error; return; }
-    localStorage.setItem('admin_token', d.token);
-    document.getElementById('msg').innerText='Login success — redirecting...';
-    setTimeout(()=>window.location.href='/admin-dashboard',800);
-  }catch(e){ document.getElementById('msg').innerText='Network error'; }
-};
+/* Auto capture countdown */
+function runAutoCapture(){
+  let s=3;
+  countdown.style.display="flex";
+  countdown.innerText=s;
+
+  let timer=setInterval(()=>{
+    s--; countdown.innerText=s;
+    if(s<=0){
+      clearInterval(timer);
+      countdown.style.display="none";
+      captureImage();
+    }
+  },700);
+}
+
+/* Manual Capture */
+document.getElementById("capture").onclick=captureImage;
+
+/* Capture Image (mirror fix included) */
+function captureImage(){
+  if(!video.videoWidth) return;
+
+  const c=document.createElement("canvas");
+  c.width=video.videoWidth;c.height=video.videoHeight;
+  const x=c.getContext("2d");
+
+  x.translate(c.width,0);
+  x.scale(-1,1);
+  x.drawImage(video,0,0,c.width,c.height);
+
+  captured=c.toDataURL("image/jpeg",0.9);
+  preview.src=captured;
+  previewBox.style.display="block";
+
+  msg.innerText="Verifying face...";
+  sendFaceToServer();
+}
+
+/* Step-2 final verification */
+async function sendFaceToServer(){
+  const form=new FormData();
+  form.append("username",username.value.trim());
+  form.append("image",captured);
+
+  const res=await fetch("/admin/login_face",{method:"POST",body:form});
+  const d=await res.json();
+
+  msg.innerText=res.ok?"Login success ✔":"Face mismatch ❌";
+
+  if(res.ok){
+      localStorage.setItem("admin_token",d.token);
+      setTimeout(()=>location.href="/admin-dashboard",700);
+  }
+}
 </script>
+
 </body>
 </html>
