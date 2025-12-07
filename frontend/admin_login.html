@@ -12,25 +12,38 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 <style>
-/* Hide oval ONLY on admin page, keep it on index + voter */
+/* Hide oval ONLY for admin page */
 body.admin-page .face-guide,
 body.admin-page .face-guide.good,
 body.admin-page .face-guide.ready,
-body.admin-page .face-guide.bad {
-    display:none !important;
-    visibility:hidden !important;
-    opacity:0 !important;
+body.admin-page .face-guide.bad{
+    display:none!important;
+}
+
+/* Camera glow like index page */
+#camBox .video-wrap{
+    width:85%;
+    max-width:350px;
+    margin:auto;
+    transition:.3s ease;
+}
+#camBox .video-wrap.active{
+    box-shadow:0 0 15px rgba(19,136,8,0.8),0 0 25px rgba(19,136,8,0.6);
+    border:2px solid #138808!important;
+}
+#camBox .video-wrap.idle{
+    box-shadow:0 0 12px rgba(255,153,51,0.6);
+    border:2px solid #FF9933!important;
 }
 </style>
 </head>
 
-<!-- IMPORTANT -->
 <body class="admin-page">
 
 <div class="strip"></div>
 <header class="gov-header">
   <div style="display:flex;align-items:center;gap:10px;">
-      <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
+      <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png">
       <div>
         <b>Vote Rakshak</b><br>
         <span style="font-size:12px;">Admin Authentication</span>
@@ -44,45 +57,44 @@ body.admin-page .face-guide.bad {
 <h3 style="color:#0a2a63">Admin Login</h3>
 
 <label class="label">Username</label>
-<input id="username" class="input" placeholder="Admin Username">
+<input id="username" class="input" placeholder="Admin Username"/>
 
 <label class="label">Password</label>
-<input id="password" type="password" class="input" placeholder="Password">
+<input id="password" type="password" class="input" placeholder="Password"/>
 
 <button id="step1" class="btn secondary" style="width:100%;margin-top:10px;">Verify Credentials</button>
 <p id="msg" class="small" style="margin-top:10px;">Step 1: Verify username & password</p>
 
-<!-- CAMERA SECTION -->
-<div id="camBox" style="display:none;margin-top:20px">
+<!-- CAMERA BLOCK -->
+<div id="camBox" style="display:none;margin-top:20px;text-align:center;">
 <label class="label">Face Verification</label>
 
-<div class="video-wrap">
+<div class="video-wrap idle">
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
-    <div id="countdown" class="countdown"></div> <!-- visible only during auto -->
+    <div id="countdown" class="countdown"></div>
 </div>
 
-<button id="capture" class="btn" style="margin-top:10px;width:100%;">Capture & Login (Manual)</button>
+<button id="capture" class="btn" style="margin-top:10px;width:100%;">Capture & Login</button>
 
 <div id="previewBox" style="display:none;text-align:center;margin-top:10px;">
     <p>Captured:</p>
-    <img id="previewImg" style="width:160px;border-radius:10px;border:2px solid #004aad;">
+    <img id="previewImg" style="width:160px;border-radius:10px;border:2px solid #004aad;box-shadow:0 0 8px rgba(0,0,0,.3)">
 </div>
-
 </div>
 </div>
 </div>
 
 <script>
-let captured=null,stable=0,autoReady=true;
+let captured=null, stable=0, autoReady=true;
 
 const msg=document.getElementById("msg");
 const video=document.getElementById("video");
-const canvas=document.getElementById("canvas");
 const preview=document.getElementById("previewImg");
 const countdown=document.getElementById("countdown");
+const camBox=document.querySelector("#camBox .video-wrap");
 
-/* Step-1 authentication */
+/* Step 1 - Verify Login Credentials */
 document.getElementById("step1").onclick=async()=>{
   let u=username.value.trim(), p=password.value.trim();
   if(!u||!p) return msg.innerText="Enter credentials first";
@@ -94,14 +106,14 @@ document.getElementById("step1").onclick=async()=>{
   });
   const d=await res.json();
 
-  if(!res.ok){ msg.innerText=d.error||"Invalid"; return; }
+  if(!res.ok) return msg.innerText=d.error||"Invalid credentials";
 
-  msg.innerText="Step 1 OK ✔ Face verification required";
-  camBox.style.display="block";
+  msg.innerText="Credentials Verified ✔ Proceed with Face Verification";
+  document.getElementById("camBox").style.display="block";
   startCamera();
 };
 
-/* ------------ MediaPipe FaceMesh Setup ------------ */
+/* FaceMesh Setup */
 const faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
 faceMesh.setOptions({maxNumFaces:1,minDetectionConfidence:0.6,minTrackingConfidence:0.6});
 faceMesh.onResults(onFaceDetect);
@@ -113,60 +125,61 @@ async function startCamera(){
   cam.start();
 }
 
-/* Auto Detect Face - No Oval Showing Here */
-function onFaceDetect(r){
-  if(r.multiFaceLandmarks.length){
+/* Face Detection Visual Feedback */
+function onFaceDetect(res){
+  if(res.multiFaceLandmarks.length){
+      camBox.classList.add("active");
+      camBox.classList.remove("idle");
       stable++;
+
       if(stable>35 && autoReady){
-          autoReady=false;
-          runAutoCapture();
+        autoReady=false;
+        runAutoCapture();
       }
+
   }else{
+      camBox.classList.remove("active");
+      camBox.classList.add("idle");
       stable=0; autoReady=true;
   }
 }
 
-/* Auto capture countdown */
+/* Auto Capture Timer */
 function runAutoCapture(){
   let s=3;
   countdown.style.display="flex";
   countdown.innerText=s;
 
-  let timer=setInterval(()=>{
+  let t=setInterval(()=>{
     s--; countdown.innerText=s;
     if(s<=0){
-      clearInterval(timer);
+      clearInterval(t);
       countdown.style.display="none";
       captureImage();
     }
   },700);
 }
 
-/* Manual Capture */
 document.getElementById("capture").onclick=captureImage;
 
-/* Capture Image (mirror fix included) */
+/* Capture + Flip */
 function captureImage(){
-  if(!video.videoWidth) return;
-
   const c=document.createElement("canvas");
-  c.width=video.videoWidth;c.height=video.videoHeight;
+  c.width=video.videoWidth; c.height=video.videoHeight;
   const x=c.getContext("2d");
 
-  x.translate(c.width,0);
-  x.scale(-1,1);
-  x.drawImage(video,0,0,c.width,c.height);
+  x.translate(c.width,0); x.scale(-1,1);
+  x.drawImage(video,0,0);
 
   captured=c.toDataURL("image/jpeg",0.9);
   preview.src=captured;
   previewBox.style.display="block";
 
   msg.innerText="Verifying face...";
-  sendFaceToServer();
+  loginWithFace();
 }
 
-/* Step-2 final verification */
-async function sendFaceToServer(){
+async function loginWithFace(){
   const form=new FormData();
   form.append("username",username.value.trim());
   form.append("image",captured);
@@ -174,7 +187,7 @@ async function sendFaceToServer(){
   const res=await fetch("/admin/login_face",{method:"POST",body:form});
   const d=await res.json();
 
-  msg.innerText=res.ok?"Login success ✔":"Face mismatch ❌";
+  msg.innerText=res.ok?"Login Successful ✔ Redirecting...":"Face Mismatch ❌";
 
   if(res.ok){
       localStorage.setItem("admin_token",d.token);

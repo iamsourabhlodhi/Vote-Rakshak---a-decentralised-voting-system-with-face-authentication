@@ -5,201 +5,207 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cast Vote - Election Portal</title>
 <link rel="stylesheet" href="style.css">
-<!-- MediaPipe FaceMesh -->
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<style>
+.video-wrap{
+ width:260px;height:200px;background:#000;margin-top:10px;border-radius:10px;
+ border:2px solid #777;overflow:hidden;position:relative;transition:.3s;
+}
+.video-wrap.active{border-color:#00c853;box-shadow:0 0 10px #00c853;}
+.video-wrap.idle{border-color:#ff9800;}
+.countdown{
+ position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+ background:#0008;color:#fff;font-size:32px;padding:8px 18px;border-radius:50%;
+ display:none;
+}
+</style>
 </head>
 
 <body>
 
 <div class="strip"></div>
 <header class="gov-header">
-  <div style="display:flex;align-items:center;gap:10px">
-   <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
-
-    <div><b>Vote Rakshak</b><br><small>Decentralised Voting System</small></div>
-  </div>
-  <nav class="top-links">
-    <a href="/">Home</a><a href="/results">Results</a><a href="/admin">Admin</a>
-  </nav>
+ <div style="display:flex;align-items:center;gap:10px">
+   <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png">
+   <div><b>Vote Rakshak</b><br><small>Decentralised Voting System</small></div>
+ </div>
+ <nav class="top-links">
+   <a href="/">Home</a>
+   <a href="/results">Results</a>
+   <a href="/admin">Admin</a>
+ </nav>
 </header>
 
 <div class="container">
 <div class="card grid">
 
-<!-- Left -->
+<!-- LEFT -->
 <div>
 <label class="label">Enrollment Number</label>
 <input id="enroll" class="input" placeholder="Enter enrollment">
 
 <label class="label">Face Verification</label>
-<div class="video-wrap">
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
-  <div id="faceGuide" class="face-guide"></div>
-  <div id="countdown" class="countdown"></div>
-</div>
 
-<div class="quality-bar"><div class="q-dot" id="q1"></div><div class="q-dot" id="q2"></div><div class="q-dot" id="q3"></div></div>
-<div id="lightCheck" class="light-warning">Low Light</div>
-<div id="blurCheck" class="blur-warning">Blurry Image</div>
-<div id="poseCheck" class="pose-warning">Align Face</div>
+<div class="video-wrap idle" id="camBox">
+ <video id="video" autoplay playsinline></video>
+ <div id="countdown" class="countdown">3</div>
+</div>
 
 <button id="cap" class="btn" style="margin-top:10px">Capture</button>
 <button id="cast" class="btn secondary" style="margin-top:10px">Submit Vote</button>
 
-<div id="previewBox"><p>Captured:</p><img id="previewImg"></div>
-<p id="msg" class="small">Align face. Auto capture will trigger.</p>
+<div id="previewBox" style="display:none;margin-top:10px;text-align:center">
+ <p>Captured Face:</p>
+ <img id="preview" style="width:160px;border-radius:10px;border:2px solid green;">
 </div>
 
-<!-- Right -->
+<p id="msg" style="margin-top:10px;color:#d32f2f"></p>
+</div>
+
+<!-- RIGHT -->
 <div>
 <h3>Select Candidate</h3>
-<div id="listCandidates"></div>
+<p style="height:10px"></p>
+<div id="cList"></div>
 </div>
 
 </div>
 </div>
+
 
 <script>
-let captured=null,stable=0,auto=true;
+let captured=null, stable=0;
+let autoEnabled=false, autoDone=false, enrollTimer=null;
 
 const video=document.getElementById("video");
-const canvas=document.getElementById("canvas");
-const ctx=canvas.getContext("2d");
-const guide=document.getElementById("faceGuide");
+const camBox=document.getElementById("camBox");
 const countdown=document.getElementById("countdown");
-const preview=document.getElementById("previewImg");
+const preview=document.getElementById("preview");
+const msg=document.getElementById("msg");
 
-/* ========= Setup FaceMesh ========= */
-const faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
-faceMesh.setOptions({
-  maxNumFaces:1,
-  refineLandmarks:true,
-  minDetectionConfidence:0.6,
-  minTrackingConfidence:0.6
+/* ---------------- Camera Start ---------------- */
+navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
+ video.srcObject=s;
+ detect();
 });
 
-faceMesh.onResults(drawFace);
+/* FaceMesh */
+const mesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+mesh.setOptions({maxNumFaces:1,minDetectionConfidence:0.55,minTrackingConfidence:0.55});
 
-async function start(){
-  const stream=await navigator.mediaDevices.getUserMedia({video:true});
-  video.srcObject=stream;
-  const cam=new Camera(video,{onFrame:async()=>{await faceMesh.send({image:video});},width:640,height:480});
-  cam.start();
-}
-start();
+mesh.onResults(r=>{
+ if(r.multiFaceLandmarks.length){
+    stable++;
+    camBox.classList.add("active"); camBox.classList.remove("idle");
 
-/* ========= Face event handler ========= */
-function drawFace(results){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  canvas.width=video.videoWidth;
-  canvas.height=video.videoHeight;
-
-  if(!results.multiFaceLandmarks.length){
-    guide.style.display="none";
-    stable=0;auto=true;
-    return;
-  }
-
-  const lm=results.multiFaceLandmarks[0];
-
-  const xs=lm.map(p=>p.x*canvas.width);
-  const ys=lm.map(p=>p.y*canvas.height);
-  const minX=Math.min(...xs), maxX=Math.max(...xs);
-  const minY=Math.min(...ys), maxY=Math.max(...ys);
-
-  const w=maxX-minX, h=maxY-minY;
-  const size=Math.max(w,h)*1.3;
-
-  guide.style.display="block";
-  guide.style.width=size+"px";
-  guide.style.height=size+"px";
-  guide.style.left=(minX+w/2-size/2)+"px";
-  guide.style.top=(minY+h/2-size/2)+"px";
-
-  stable++;
-  qualityDots(3); // (we can integrate blur later)
-
-  guide.className="face-guide good";
-  if(stable>40 && auto){ auto=false; triggerAutoCap(); }
-}
-
-/* ========= Auto capture ========= */
-function triggerAutoCap(){
-  countdown.style.display="flex";
-  let s=3;
-  countdown.innerText=s;
-  let t=setInterval(()=>{
-    s--; countdown.innerText=s;
-    if(s<=0){
-      clearInterval(t);countdown.style.display="none";
-      captureFrame();
+    if(stable>25 && autoEnabled && !autoDone && !captured){
+        autoDone=true;
+        startTimer();
     }
-  },700);
+ }else{
+    stable=0;
+    camBox.classList.remove("active");
+    camBox.classList.add("idle");
+ }
+});
+
+
+async function detect(){
+ const cam=new Camera(video,{onFrame:async()=>await mesh.send({image:video})});
+ cam.start();
 }
 
-document.getElementById("cap").onclick=captureFrame;
-function captureFrame(){
-  const c=document.createElement("canvas");
-  c.width=video.videoWidth;c.height=video.videoHeight;
-  const x=c.getContext("2d");
-  x.translate(c.width,0);x.scale(-1,1);
-  x.drawImage(video,0,0);
-  captured=c.toDataURL("image/jpeg",0.9);
-  preview.src=captured;
-  preview.parentElement.style.display="block";
+/* 🔥 Enrollment stop-typing based activation */
+document.getElementById("enroll").addEventListener("input",()=>{
+ autoEnabled=false;
+ autoDone=false;
+ captured=null;
+ previewBox.style.display="none";
+
+ if(enrollTimer) clearTimeout(enrollTimer);
+
+ enrollTimer=setTimeout(()=>{
+   if(enroll.value.trim()!=""){
+      autoEnabled=true;
+      console.log("✔ Auto capture unlocked");
+   }
+ },1000);  // waits 1s after typing stopped
+});
+
+
+/* Auto Capture Countdown */
+function startTimer(){
+ let s=3;
+ countdown.innerText=s; countdown.style.display="flex";
+ let t=setInterval(()=>{
+  s--; countdown.innerText=s;
+  if(s<=0){clearInterval(t);countdown.style.display="none";capture();}
+ },700);
 }
 
-/* UI Quality Dots */
-function qualityDots(n){
-  [q1,q2,q3].forEach(e=>e.className="q-dot");
-  if(n>=1)q1.classList.add("q-good");
-  if(n>=2)q2.classList.add("q-good");
-  if(n>=3)q3.classList.add("q-good");
+/* Manual Capture */
+document.getElementById("cap").onclick=capture;
+function capture(){
+ const c=document.createElement("canvas");
+ c.width=video.videoWidth;c.height=video.videoHeight;
+ let x=c.getContext("2d");
+ x.translate(c.width,0); x.scale(-1,1);
+ x.drawImage(video,0,0);
+
+ captured=c.toDataURL("image/jpeg",0.9);
+ preview.src=captured;
+ previewBox.style.display="block";
+ msg.style.color="green"; msg.innerText="Face Captured ✔";
 }
 
-/* Load candidates */
-async function loadCandidates(){
-  const r=await fetch("/candidates");
-  const d=await r.json();
-  const box=document.getElementById("listCandidates");
-  box.innerHTML="";
+/* Load Candidates (Preserve selection) */
+async function load(){
+ let prev=document.querySelector("input[name=cand]:checked");
+ let val=prev?prev.value:null;
 
-  d.forEach(c=>{
-    let el=document.createElement("div");
-    el.className="candidate";
-    el.innerHTML=`
-      <strong>${c.id}. ${c.name}</strong>
-      <span class="badge">${c.votes ?? 0} Votes</span>
-      <input type="radio" name="candidate" value="${c.id}">
-    `;
-    box.appendChild(el);
-  });
+ let r=await fetch("/candidates"); let d=await r.json();
+ cList.innerHTML="";
+
+ d.forEach(c=>{
+  cList.innerHTML+=`
+  <label class="candidate">
+     <input type="radio" name="cand" value="${c.id}">
+     <b>${c.name}</b>
+     <span class="badge">${c.votes}</span>
+  </label>`;
+ });
+
+ if(val){
+   let rb=document.querySelector(`input[value='${val}']`);
+   if(rb) rb.checked=true;
+ }
 }
-loadCandidates();
-// Auto Refresh Every 3 Seconds
-setInterval(loadCandidates, 3000);
+load(); setInterval(load,3000);
 
-
-/* Submit vote */
+/* Submit Vote */
 document.getElementById("cast").onclick=async()=>{
-  const e=document.getElementById("enroll").value.trim();
-  const s=document.querySelector("input[name='candidate']:checked");
-  if(!e)return msg.innerText="Enter enrollment";
-  if(!captured)return msg.innerText="Capture face";
-  if(!s)return msg.innerText="Select candidate";
+ let e=enroll.value.trim();
+ let s=document.querySelector("input[name=cand]:checked");
 
-  const f=new FormData();
-  f.append("enrollment",e);
-  f.append("candidate_id",s.value);
-  f.append("image",captured);
+ if(!e) return msg.innerText="Enter Enrollment Number";
+ if(!captured) return msg.innerText="Capture Face First";
+ if(!s) return msg.innerText="Select a Candidate";
 
-  const res=await fetch("/vote",{method:"POST",body:f});
-  msg.innerText=res.ok?"Vote submitted ✔": "Failed ❌";
+ let fd=new FormData();
+ fd.append("enrollment",e);
+ fd.append("candidate_id",s.value);
+ fd.append("image",captured);
+
+ let r=await fetch("/vote",{method:"POST",body:fd});
+ let d=await r.json();
+
+ msg.style.color= r.ok?"green":"red";
+ msg.innerText= r.ok?"Vote Submitted Successfully ✔":"❌ "+(d.error || "Failed");
 };
 </script>
-
 </body>
 </html>

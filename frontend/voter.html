@@ -5,160 +5,175 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Register Voter - Election Portal</title>
 <link rel="stylesheet" href="style.css">
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<style>
+.video-wrap{
+   width:85%;max-width:380px;margin:auto;
+   border:1px solid #bbb;border-radius:10px;background:#000;
+   overflow:hidden;position:relative;transition:.3s;
+}
+.video-wrap.active{
+   box-shadow:0 0 15px #00ff2a;border-color:#00ff2a!important;
+}
+.video-wrap.idle{
+   box-shadow:0 0 12px #ff8800;border-color:#ff8800!important;
+}
+@media(max-width:768px){.video-wrap{max-width:300px}}
+.face-guide,.face-box{display:none!important;}
+</style>
 </head>
+
 <body>
 
 <div class="strip"></div>
 <header class="gov-header">
-  <div style="display:flex;align-items:center;gap:10px;">
-    <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
-    <div>
-      <b>Vote Rakshak</b><br>
-      <span style="font-size:12px;">Voter Enrollment</span>
-    </div>
-  </div>
-  <nav class="top-links"><a href="/admin-dashboard">Back to Admin</a></nav>
+ <div style="display:flex;align-items:center;gap:10px;">
+   <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png">
+   <div><b>Vote Rakshak</b><br><small>Voter Enrollment</small></div>
+ </div>
+ <nav class="top-links"><a href="/admin-dashboard">Back to Admin</a></nav>
 </header>
 
 <div class="container">
 <div class="card" style="max-width:600px;margin:auto">
 
-<h3 style="color:#0a2a63">Register New Voter</h3>
+<h3 style="color:#0a2a63;margin-bottom:10px;">Register New Voter</h3>
 
 <label class="label">Enrollment Number</label>
 <input id="enroll" class="input" placeholder="Enter enrollment">
 
 <label class="label">Full Name</label>
-<input id="name" class="input" placeholder="Enter voter full name">
+<input id="nameInput" class="input" placeholder="Enter name">
 
-<label class="label">Capture Face</label>
-<div class="video-wrap">
-    <video id="vid" autoplay playsinline></video>
+<p id="startMsg" style="color:#d14;font-weight:bold;margin-bottom:10px;">
+📌 Enter Enrollment & Name to enable face capture
+</p>
 
-    <div id="faceBox" class="face-box"></div>
-    <div class="face-guide"></div>
-    <div id="countdown" class="countdown"></div>
+<div class="video-wrap idle" id="camBox">
+ <video id="vid" autoplay playsinline></video>
+ <div id="countdown" class="countdown"></div>
 </div>
 
-<div class="quality-bar"><div class="q-dot" id="q1"></div><div class="q-dot" id="q2"></div><div class="q-dot" id="q3"></div></div>
-
-<div id="lightCheck" class="light-warning">⚠ Low Light</div>
-<div id="blurCheck" class="blur-warning">❗ Image Blurry</div>
-<div id="poseCheck" class="pose-warning">🙂 Look Straight</div>
-
-<button id="cap" class="btn secondary" style="margin-top:10px;width:100%;">Capture Photo</button>
+<button id="cap" class="btn secondary" style="margin-top:12px;width:100%;">Capture Photo</button>
 <button id="reg" class="btn" style="margin-top:10px;width:100%;">Save Voter</button>
 
-<div id="previewBox">
-<p style="font-size:13px">Captured Image:</p>
-<img id="previewImg">
+<div id="previewBox" style="display:none;text-align:center;margin-top:10px;">
+<p>Captured:</p>
+<img id="previewImg" style="width:160px;border-radius:10px;border:2px solid green;">
 </div>
 
-<p id="msg" class="small" style="margin-top:10px;"></p>
+<p id="msg" style="margin-top:10px;font-weight:bold;"></p>
 
 </div>
 </div>
 
 <script>
-let stream=null,captured=null,stable=0,auto=false;
-const video=document.getElementById("vid");
+let captured=null,stable=0,autoEnabled=false,photoTaken=false;
 
-/* Camera Start */
-navigator.mediaDevices.getUserMedia({video:{width:640}}).then(s=>{
-   stream=s; video.srcObject=s; detect();
+const enroll=document.getElementById("enroll");
+const nameInput=document.getElementById("nameInput");
+const video=document.getElementById("vid");
+const camBox=document.getElementById("camBox");
+const preview=document.getElementById("previewImg");
+
+/* Enable auto capture only when details filled */
+function enableDetection(){
+ if(enroll.value.trim()!=="" && nameInput.value.trim()!==""){
+   autoEnabled=true;
+   startMsg.innerText="✔ Face capture active – look into camera";
+ } else {
+   autoEnabled=false;
+   startMsg.innerText="📌 Enter Enrollment & Name first";
+ }
+}
+enroll.oninput=nameInput.oninput=enableDetection;
+
+/* Start Camera */
+navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
+ video.srcObject=stream;
+ new Camera(video,{onFrame:async()=>await faceMesh.send({image:video}) }).start();
 });
 
-/* Face Detector */
-const detector=('FaceDetector' in window)?new FaceDetector({fastMode:true,maxDetectedFaces:1}):null;
+/* MediaPipe */
+const faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.6,minTrackingConfidence:0.6});
+faceMesh.onResults(res=>{
+ if(!autoEnabled || photoTaken) return; // ❗ prevents repeated captures
 
-async function detect(){
- if(!video.videoWidth){requestAnimationFrame(detect);return;}
-
- const f=await detector.detect(video).catch(()=>[]);
- if(f.length){
-   faceBox.style.display="block";
-   let b=f[0].boundingBox;
-   faceBox.style.left=(b.x+b.width/2)+"px";
-   faceBox.style.top=(b.y+b.height/2)+"px";
-   faceBox.style.width=b.width+"px";
-   faceBox.style.height=b.height+"px";
+ if(res.multiFaceLandmarks.length){
    stable++;
+   camBox.classList.add("active");
+   camBox.classList.remove("idle");
 
-   qualityCheck(b);
-   if(stable>30 && !auto){ auto=true; autoSnap(); }
- }else{ faceBox.style.display="none"; stable=0; }
-
- requestAnimationFrame(detect);
-}
-
-/* BLUR / LIGHT / POSE checks (same as index.html logic) */
-function qualityCheck(b){
-   // Light
-   const c=document.createElement("canvas");
-   c.width=64;c.height=64;
-   c.getContext("2d").drawImage(video,0,0,64,64);
-   let d=c.getContext("2d").getImageData(0,0,64,64).data,sum=0;
-   for(let i=0;i<d.length;i+=4)sum+=(d[i]+d[i+1]+d[i+2])/3;
-   let bright=sum/(64*64);
-   lightCheck.style.display=bright<70?"block":"none";
-
-   // Blur
-   const t=document.createElement("canvas");
-   t.width=video.videoWidth;t.height=video.videoHeight;
-   let ctx=t.getContext("2d");
-   ctx.drawImage(video,0,0);
-   let img=ctx.getImageData(0,0,t.width,t.height).data,a=0;
-   for(let i=0;i<img.length;i+=4)a+=Math.abs(img[i]-(img[i+4]||img[i]));
-   blurCheck.style.display=a/(img.length/4)<9?"block":"none";
-
-   // Pose
-   let center=video.videoWidth/2;
-   let faceCenter=b.x+b.width/2;
-   poseCheck.style.display=Math.abs(faceCenter-center)>80?"block":"none";
-
-   [q1,q2,q3].forEach(e=>e.className="q-dot");
-   if(bright>120)q3.classList.add("q-good");
-   else if(bright>75)q2.classList.add("q-mid"),q1.classList.add("q-mid");
-   else q1.classList.add("q-bad");
-}
+   if(stable>35){
+      stable=0;
+      autoCapture();
+   }
+ } else { stable=0; }
+});
 
 /* Auto countdown */
-function autoSnap(){
- countdown.style.display="flex";
- let s=3; countdown.innerText=s;
- let tm=setInterval(()=>{
+function autoCapture(){
+ let s=3;
+ countdown.style.display="flex"; countdown.innerText=s;
+
+ let t=setInterval(()=>{
   s--; countdown.innerText=s;
-  if(s<=0){clearInterval(tm); countdown.style.display="none"; capture(); }
+  if(s<=0){
+    clearInterval(t);
+    countdown.style.display="none";
+    capture();
+  }
  },700);
 }
-cap.onclick=()=>capture();
 
-/* Capture */
+/* Manual capture */
+cap.onclick=capture;
+
+/* Capture Image */
 function capture(){
  const c=document.createElement("canvas");
  c.width=video.videoWidth;c.height=video.videoHeight;
  let ctx=c.getContext("2d");
- ctx.translate(c.width,0); ctx.scale(-1,1);
+
+ ctx.translate(c.width,0);ctx.scale(-1,1);
  ctx.drawImage(video,0,0);
 
  captured=c.toDataURL("image/jpeg",0.9);
- previewImg.src=captured; previewBox.style.display="block";
- msg.innerText="Image captured ✔";
+ previewImg.src=captured;
+ previewBox.style.display="block";
+
+ msg.innerText="✔ Image Captured";
+ photoTaken=true;           // << stops repeated auto capture
 }
 
-/* Save to DB */
+/* Save Voter */
 reg.onclick=async()=>{
- const e=enroll.value.trim(),n=name.value.trim();
- if(!e||!n) return msg.innerText="Fill details";
- if(!captured) return msg.innerText="Capture photo first";
+ let e=enroll.value.trim(),n=nameInput.value.trim();
+
+ if(!e||!n) return msg.innerText="⚠ Enter details!";
+ if(!captured) return msg.innerText="⚠ Capture photo first!";
 
  let fd=new FormData();
- fd.append("enrollment",e); fd.append("name",n); fd.append("image",captured);
+ fd.append("enrollment",e);
+ fd.append("name",n);
+ fd.append("image",captured);
 
- let r=await fetch("/admin/register_voter_camera",{method:"POST",headers:{'Authorization':'Bearer '+localStorage.getItem("admin_token")},body:fd});
- let d=await r.json();
- msg.innerText=r.ok?"Voter registered ✔":d.error;
+ let res=await fetch("/admin/register_voter_camera",{
+  method:"POST",
+  headers:{Authorization:"Bearer "+localStorage.getItem("admin_token")},
+  body:fd
+ });
+
+ let d=await res.json().catch(()=>({error:"Invalid response"}));
+ msg.innerText=res.ok?"🎉 Voter Registered Successfully!":"❌ "+d.error;
 };
 </script>
+
 </body>
 </html>

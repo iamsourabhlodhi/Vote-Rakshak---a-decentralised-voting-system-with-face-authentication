@@ -1,120 +1,126 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Admin Dashboard - Election Portal</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard</title>
 <link rel="stylesheet" href="style.css">
+
+<style>
+.table{
+ width:100%;border-collapse:collapse;margin-top:15px;
+}
+.table th,.table td{
+ border:1px solid #ddd;padding:8px;text-align:left;
+}
+.table th{background:#0a3475;color:white;}
+input,button{margin-top:10px;}
+.sec{margin-top:30px;}
+</style>
 </head>
+
 <body>
 
 <div class="strip"></div>
-<header class="gov-header">
-  <div style="display:flex;align-items:center;gap:10px;">
-    <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png" alt="">
-    <div>
-      <b>Vote Rakshak</b><br>
-      <span style="font-size:12px;">Admin Control Panel</span>
-    </div>
-  </div>
 
-  <nav class="top-links">
-      <a href="/admin-dashboard">Home</a>
-      <a href="#" id="logout">Logout</a>
-  </nav>
+<header class="gov-header">
+ <div style="display:flex;align-items:center;gap:10px">
+   <img class="ashoka" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/500px-Emblem_of_India.svg.png">
+   <div><b>Admin Panel</b><br><small>Vote-Rakshak System</small></div>
+ </div>
+ <nav class="top-links">
+  <a href="/">Home</a>
+  <a href="/results">Results</a>
+  <a onclick="logout()" style="cursor:pointer">Logout</a>
+ </nav>
 </header>
 
 <div class="container">
+<div class="card">
+
+<h2 style="color:#0a3475;text-align:center;">Admin Dashboard</h2>
 
 <!-- Add Candidate -->
-<div class="card">
-<h3 style="color:#0a2a63">Add New Candidate</h3>
-
-<label class="label">Candidate Name</label>
-<input id="candName" class="input" placeholder="Enter candidate name">
-
-<button id="addCand" class="btn" style="margin-top:10px;">Add Candidate</button>
-
-<p id="candMsg" class="small" style="margin-top:10px;">Candidate will appear in voting list</p>
+<div class="sec">
+<h3>Add Candidate</h3>
+<input id="cname" class="input" placeholder="Candidate Name" style="width:240px;">
+<button class="btn" onclick="addCandidate()">Add</button>
+<p id="msg1" class="small"></p>
 </div>
 
-<!-- Voter List -->
-<div class="card">
-<h3 style="color:#0a2a63">Registered Voters</h3>
-<div id="voterArea" style="max-height:300px;overflow:auto;margin-top:8px"></div>
+<!-- View Candidates -->
+<div class="sec">
+<h3>All Candidates</h3>
+<table class="table" id="candTable"></table>
 </div>
 
-<!-- Candidate List -->
-<div class="card">
-<h3 style="color:#0a2a63">Candidate List</h3>
-<div id="candidateList" style="margin-top:8px"></div>
-
-<a href="/voter" class="btn secondary" style="margin-top:12px;display:inline-block;">Register New Voter (Camera)</a>
+<!-- Voters List -->
+<div class="sec">
+<h3>Registered Voters</h3>
+<button class="btn secondary" onclick="location.href='/voter'">+ Register New Voter</button>
+<table class="table" id="voterTable"></table>
 </div>
 
+</div>
 </div>
 
 <script>
-const token = localStorage.getItem("admin_token");
-if(!token) location.href="/admin";
-
-document.getElementById("logout").onclick = ()=>{
-  localStorage.removeItem("admin_token");
-  location.href="/admin";
-};
-
-document.getElementById("addCand").onclick = async ()=>{
-  const name=document.getElementById("candName").value.trim();
-  if(!name) return candMsg.innerText="Enter name";
-
-  const res=await fetch("/admin/add_candidate",{
-    method:"POST",
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({name})
-  });
-
-  const d=await res.json();
-  candMsg.innerText = res.ok ? "Candidate added ✔" : d.error;
-  loadCandidates();
-};
-
-async function loadVoters(){
-  const res=await fetch("/admin/voters",{headers:{'Authorization':'Bearer '+token}});
-  const data=await res.json();
-  voterArea.innerHTML="";
-
-  if(!data.length) return voterArea.innerHTML="<div class='small'>No voters</div>";
-
-  let t=document.createElement("table");
-  t.className="table";
-  t.innerHTML="<thead><tr><th>Enrollment</th><th>Name</th></tr></thead>";
-  let body=document.createElement("tbody");
-
-  data.forEach(v=>{
-    let row=document.createElement("tr");
-    row.innerHTML=`<td>${v.enrollment}</td><td>${v.name}</td>`;
-    body.appendChild(row);
-  });
-
-  t.appendChild(body);
-  voterArea.appendChild(t);
+// check token
+if(!localStorage.getItem("admin_token")){
+ alert("Login Required!");
+ location.href="/admin";
 }
 
+// Load candidates
 async function loadCandidates(){
-  const r=await fetch("/candidates");
-  const d=await r.json();
-  candidateList.innerHTML="";
+ let r=await fetch("/candidates");
+ let d=await r.json();
+ let t=document.getElementById("candTable");
+ t.innerHTML="<tr><th>ID</th><th>Name</th><th>Votes</th></tr>";
+ d.forEach(c=>{
+  t.innerHTML+=`<tr><td>${c.id}</td><td>${c.name}</td><td>${c.votes}</td></tr>`;
+ });
+}
+loadCandidates();
 
-  d.forEach(c=>{
-    let el=document.createElement("div");
-    el.className="candidate";
-    el.innerHTML=`<strong>${c.id}. ${c.name}</strong><div class="badge">${c.votes}</div>`;
-    candidateList.appendChild(el);
-  });
+// Load voters
+async function loadVoters(){
+ let r=await fetch("/admin/voters",{headers:{Authorization:"Bearer "+localStorage.getItem("admin_token")}});
+ if(!r.ok) return;
+ let d=await r.json();
+ let t=document.getElementById("voterTable");
+ t.innerHTML="<tr><th>ID</th><th>Enrollment</th><th>Name</th></tr>";
+ d.forEach(v=>{
+  t.innerHTML+=`<tr><td>${v.id}</td><td>${v.enrollment}</td><td>${v.name}</td></tr>`;
+ });
+}
+loadVoters();
+
+// add candidate
+async function addCandidate(){
+ let name=cname.value.trim();
+ if(!name) return msg1.innerText="Enter name";
+ msg1.innerText="Processing...";
+ let r=await fetch("/admin/add_candidate",{
+  method:"POST",
+  headers:{
+    "Content-Type":"application/json",
+    Authorization:"Bearer "+localStorage.getItem("admin_token")
+  },
+  body:JSON.stringify({name})
+ });
+ let d=await r.json();
+ if(r.ok){
+   msg1.style.color="green"; msg1.innerText="Added ✔";
+   cname.value=""; loadCandidates();
+ }else msg1.innerText=d.error;
 }
 
-loadVoters(); loadCandidates();
+// logout
+function logout(){
+ localStorage.removeItem("admin_token");
+ location.href="/admin";
+}
 </script>
-
 </body>
 </html>

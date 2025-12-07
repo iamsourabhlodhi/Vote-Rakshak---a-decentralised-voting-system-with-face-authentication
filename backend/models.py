@@ -5,23 +5,31 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.mysql import LONGBLOB
 import urllib.parse
 
-# ---------------- DB CONFIG ----------------
+# ---------------------------------------------------------
+#   DATABASE CONFIG
+# ---------------------------------------------------------
 MYSQL_USER = "root"
 MYSQL_PASSWORD = "@2318S"
 MYSQL_HOST = "127.0.0.1"
 MYSQL_PORT = "3306"
 MYSQL_DB = "decentralised_voting"
 
-encoded_password = urllib.parse.quote_plus(MYSQL_PASSWORD)
+encoded_pass = urllib.parse.quote_plus(MYSQL_PASSWORD)
+
 DATABASE_URL = (
-    f"mysql+pymysql://{MYSQL_USER}:{encoded_password}@"
+    f"mysql+pymysql://{MYSQL_USER}:{encoded_pass}@"
     f"{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
 )
 
+# ---------------------------------------------------------
+#   ENGINE + BASE
+# ---------------------------------------------------------
+engine = create_engine(DATABASE_URL, echo=False)
 Base = declarative_base()
 
-# ---------------- MODELS ----------------
-
+# ---------------------------------------------------------
+#   MODELS
+# ---------------------------------------------------------
 class Admin(Base):
     __tablename__ = "admin"
 
@@ -29,7 +37,7 @@ class Admin(Base):
     username = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(300), nullable=False)
 
-    # FIXED → Now supports full-size face embedding (150 KB+)
+    # Face embedding (128 floats ≈ 512 bytes, but we keep LONGBLOB for future)
     face_encoding = Column(LONGBLOB, nullable=False)
 
 
@@ -40,18 +48,18 @@ class Voter(Base):
     enrollment = Column(String(50), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
 
-    # FIXED → Now supports full-size encoding for all voters
-    face_encoding = Column(LONGBLOB, nullable=True)
+    # Face embedding
+    face_encoding = Column(LONGBLOB, nullable=False)
 
 
-# ---------------- ENGINE + SESSION ----------------
-
-engine = create_engine(DATABASE_URL, echo=False)
-
-# Create tables if not exist
+# ---------------------------------------------------------
+#   CREATE TABLES IF NOT EXISTS
+# ---------------------------------------------------------
 Base.metadata.create_all(engine)
 
-Session = sessionmaker(bind=engine)
-session = Session()
+# ---------------------------------------------------------
+#   SESSION FACTORY
+# ---------------------------------------------------------
+SessionLocal = sessionmaker(bind=engine)
 
-print("✅ DB Ready")
+print("✅ Database connected & models ready")
