@@ -8,8 +8,8 @@ import urllib.parse
 # ---------------------------------------------------------
 #   DATABASE CONFIG
 # ---------------------------------------------------------
-MYSQL_USER = "root"
-MYSQL_PASSWORD = "@2318S"
+MYSQL_USER = "add username of you database user"
+MYSQL_PASSWORD = "password of database user"
 MYSQL_HOST = "127.0.0.1"
 MYSQL_PORT = "3306"
 MYSQL_DB = "decentralised_voting"
