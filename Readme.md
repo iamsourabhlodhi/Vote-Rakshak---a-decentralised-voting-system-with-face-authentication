@@ -128,6 +128,16 @@ project/
 
 Python 3.10 recommended
 
+Create a venv 
+
+python -m venv venv310
+
+then activate venv310
+
+.\venv310\scripts\activate 
+
+then 
+
 pip install -r requirements.txt
 
 
