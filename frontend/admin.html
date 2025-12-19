@@ -57,7 +57,20 @@ input,button{margin-top:10px;}
 <!-- Voters List -->
 <div class="sec">
 <h3>Registered Voters</h3>
-<button class="btn secondary" onclick="location.href='/voter'">+ Register New Voter</button>
+<button class="btn secondary" onclick="openVoter()">+ Register New Voter</button>
+
+<script>
+function openVoter(){
+  const token = localStorage.getItem("admin_token");
+  if(!token){
+    alert("Login expired");
+    location.href="/admin";
+    return;
+  }
+  window.location.href = "/voter?token=" + token;
+}
+</script>
+
 <table class="table" id="voterTable"></table>
 </div>
 

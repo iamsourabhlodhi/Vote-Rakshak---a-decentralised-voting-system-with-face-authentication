@@ -11,7 +11,7 @@ username = input("Username: ").strip()
 password = input("Password: ").strip()
 
 # ---------------- Camera capture ----------------
-print("\n📷 Starting camera. Press SPACE to capture, ESC to quit.")
+print("\n Starting camera. Press SPACE to capture, ESC to quit.")
 cam = cv2.VideoCapture(0)
 
 if not cam.isOpened():

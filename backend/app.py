@@ -18,7 +18,7 @@ from config.secret import (
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_PATH = os.path.join(BASE_DIR, "../frontend")   # backend/ .. /frontend
+FRONTEND_PATH = os.path.join(BASE_DIR, "../frontend")   
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -91,8 +91,7 @@ def send_contract_tx(fn, *args, gas=350000):
         )
         signed = w3.eth.account.sign_transaction(tx, private_key=ADMIN_PRIVATE_KEY)
         tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-        # optional: wait for receipt
-        # w3.eth.wait_for_transaction_receipt(tx_hash)
+        
         return tx_hash.hex(), None
     except ValueError as e:
         err = e.args[0]
@@ -162,7 +161,17 @@ def candidate_page():
 
 @app.route("/voter")
 def voter_page():
+    token = request.args.get("token")
+    if not token:
+        return "Unauthorized", 401
+
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except:
+        return "Invalid or expired token", 401
+
     return send_from_directory(FRONTEND_PATH, "voter.html")
+
 
 
 @app.route("/results")
@@ -385,5 +394,5 @@ def candidates_list():
 
 # ---------------- Run ----------------
 if __name__ == "__main__":
-    print("\n🚀 Server running at http://127.0.0.1:5000\n")
+    print("\n Server running at http://127.0.0.1:5000\n")
     app.run(debug=True)
